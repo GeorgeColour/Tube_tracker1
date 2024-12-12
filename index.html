@@ -40,54 +40,66 @@
             color: #007aff;
             text-decoration: none;
         }
+        .error {
+            color: red;
+            text-align: center;
+        }
     </style>
 </head>
 <body>
-    <div id="departures">Loading...</div>
+    <div id="departures">Loading departures...</div>
     <div class="refresh">
         <a href="#action=refresh" onclick="event.preventDefault(); fetchDepartures();">↻ Refresh</a>
     </div>
 
     <script>
-        // TfL API Configuration
-        const API_KEY = 'YOUR_TFL_API_KEY';
-        const STATION_ID = 'leicester-square';
-        const LINE_ID = 'piccadilly';
+        // Proxy API for TfL data (replace with your own proxy if needed)
+        const PROXY_URL = 'https://cors-anywhere.herokuapp.com/';
+        const TFL_URL = 'https://api.tfl.gov.uk/StopPoint/leicester-square/Arrivals?lineIds=piccadilly&direction=eastbound';
 
         // Function to fetch departures
         async function fetchDepartures() {
+            const departuresDiv = document.getElementById('departures');
+            
             try {
-                const response = await fetch(`https://api.tfl.gov.uk/StopPoint/${STATION_ID}/Arrivals?lineIds=${LINE_ID}&direction=eastbound`, {
-                    headers: {
-                        'app_key': API_KEY
-                    }
-                });
+                // Use proxy to bypass CORS
+                const response = await fetch(PROXY_URL + TFL_URL);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
                 const data = await response.json();
 
-                // Sort by time to station
+                // Sort and filter departures
                 const sortedDepartures = data
-                    .filter(train => train.direction === 'eastbound')
+                    .filter(train => 
+                        train.direction === 'eastbound' && 
+                        train.lineName.toLowerCase() === 'piccadilly'
+                    )
                     .sort((a, b) => a.timeToStation - b.timeToStation)
                     .slice(0, 3);
 
-                displayDepartures(sortedDepartures);
+                // Display departures
+                departuresDiv.innerHTML = sortedDepartures.length 
+                    ? sortedDepartures.map(train => `
+                        <div class="departure">
+                            <span class="destination">${train.destinationName}</span>
+                            <span class="time">${Math.floor(train.timeToStation/60)} min</span>
+                        </div>
+                    `).join('') 
+                    : 'No upcoming departures';
+
             } catch (error) {
-                document.getElementById('departures').innerHTML = 'Error fetching departures';
+                departuresDiv.innerHTML = `
+                    <div class="error">
+                        Error fetching departures: ${error.message}<br>
+                        Check network connection
+                    </div>
+                `;
+                // Log error for debugging
                 __wweb2Log(`Departure fetch error: ${error.message}`);
             }
-        }
-
-        // Function to display departures
-        function displayDepartures(departures) {
-            const departuresDiv = document.getElementById('departures');
-            departuresDiv.innerHTML = departures.length 
-                ? departures.map(train => `
-                    <div class="departure">
-                        <span class="destination">${train.destinationName}</span>
-                        <span class="time">${Math.floor(train.timeToStation/60)} min</span>
-                    </div>
-                `).join('') 
-                : 'No upcoming departures';
         }
 
         // Ensure widget is ready quickly
