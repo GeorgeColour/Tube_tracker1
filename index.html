@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta name="js-widget-title" content="Leicester Sq Tube">
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+            margin: 0;
+            padding: 10px;
+            background-color: #f4f4f4;
+            color: #333;
+        }
+        #departures {
+            background-color: white;
+            border-radius: 10px;
+            padding: 10px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .departure {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 5px;
+            padding: 5px 0;
+            border-bottom: 1px solid #eee;
+        }
+        .destination {
+            font-weight: bold;
+        }
+        .time {
+            color: #007aff;
+            font-weight: bold;
+        }
+        .refresh {
+            text-align: center;
+            margin-top: 10px;
+            color: #666;
+        }
+        .refresh a {
+            color: #007aff;
+            text-decoration: none;
+        }
+    </style>
+</head>
+<body>
+    <div id="departures">Loading...</div>
+    <div class="refresh">
+        <a href="#action=refresh" onclick="event.preventDefault(); fetchDepartures();">↻ Refresh</a>
+    </div>
+
+    <script>
+        // TfL API Configuration
+        const API_KEY = 'YOUR_TFL_API_KEY';
+        const STATION_ID = 'leicester-square';
+        const LINE_ID = 'piccadilly';
+
+        // Function to fetch departures
+        async function fetchDepartures() {
+            try {
+                const response = await fetch(`https://api.tfl.gov.uk/StopPoint/${STATION_ID}/Arrivals?lineIds=${LINE_ID}&direction=eastbound`, {
+                    headers: {
+                        'app_key': API_KEY
+                    }
+                });
+                const data = await response.json();
+
+                // Sort by time to station
+                const sortedDepartures = data
+                    .filter(train => train.direction === 'eastbound')
+                    .sort((a, b) => a.timeToStation - b.timeToStation)
+                    .slice(0, 3);
+
+                displayDepartures(sortedDepartures);
+            } catch (error) {
+                document.getElementById('departures').innerHTML = 'Error fetching departures';
+                __wweb2Log(`Departure fetch error: ${error.message}`);
+            }
+        }
+
+        // Function to display departures
+        function displayDepartures(departures) {
+            const departuresDiv = document.getElementById('departures');
+            departuresDiv.innerHTML = departures.length 
+                ? departures.map(train => `
+                    <div class="departure">
+                        <span class="destination">${train.destinationName}</span>
+                        <span class="time">${Math.floor(train.timeToStation/60)} min</span>
+                    </div>
+                `).join('') 
+                : 'No upcoming departures';
+        }
+
+        // Ensure widget is ready quickly
+        function __wweb2WaitMillisecondsToWidgetIsReady(currentDelayMs) {
+            return 0;
+        }
+
+        // Widget title function
+        function __wweb2JsWidgetTitle() {
+            return "Leicester Sq Tube";
+        }
+
+        // Initial load
+        fetchDepartures();
+
+        // Handle refresh action
+        let queryString = window.location.hash;
+        if (queryString.startsWith("#")) {
+            queryString = queryString.substring(1);
+        }
+        const urlParams = new URLSearchParams(queryString);
+        const actionParam = urlParams.get('action');
+        
+        if (actionParam === 'refresh') {
+            fetchDepartures();
+        }
+    </script>
+</body>
+</html>
